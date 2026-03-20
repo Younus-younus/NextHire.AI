@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_from_directory
 from flask_cors import CORS
 import os
 import joblib
@@ -8,6 +8,7 @@ import nltk
 from nltk.corpus import stopwords
 import PyPDF2
 import docx
+import time
 
 app = Flask(__name__, static_folder='static', template_folder='templates')
 CORS(app)
@@ -430,13 +431,13 @@ def predict():
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
         
-        # Save the uploaded file
-        file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+        # Save the uploaded file with a unique name for serving
+        file_extension = file.filename.rsplit('.', 1)[1].lower()
+        unique_filename = f"resume_{int(time.time())}.{file_extension}"
+        file_path = os.path.join(UPLOAD_FOLDER, unique_filename)
         file.save(file_path)
         
         # Extract text based on file type
-        file_extension = file.filename.rsplit('.', 1)[1].lower()
-        
         if file_extension == 'pdf':
             resume_text = extract_text_from_pdf(file_path)
         elif file_extension == 'docx':
@@ -444,13 +445,12 @@ def predict():
         elif file_extension == 'txt':
             resume_text = extract_text_from_txt(file_path)
         else:
+            os.remove(file_path)
             return jsonify({'error': 'Unsupported file format. Please upload PDF, DOCX, or TXT'}), 400
-        
-        # Clean up uploaded file
-        os.remove(file_path)
         
         # Check if text was extracted
         if not resume_text or len(resume_text.strip()) < 50:
+            os.remove(file_path)
             return jsonify({'error': 'Could not extract sufficient text from resume'}), 400
         
         # Extract skills from resume
@@ -502,7 +502,7 @@ def predict():
                 'questions': questions
             })
         
-        # Prepare response with new features
+        # Prepare response with file URL for viewing
         response = {
             'primary_role': recommendations[0]['role'],
             'primary_confidence': recommendations[0]['confidence'],
@@ -514,7 +514,9 @@ def predict():
                 'reason': f"Best match based on {int(best_fit['confidence']*100)}% confidence and {int(best_fit['skill_match'])}% skill match"
             },
             'job_opportunities': job_opportunities,
-            'interview_prep': interview_questions_all
+            'interview_prep': interview_questions_all,
+            'resume_file_url': f'/uploads/{unique_filename}',  # URL to serve the file
+            'resume_filename': file.filename
         }
         
         return jsonify(response)
@@ -527,6 +529,12 @@ def predict():
         print(f"Traceback:")
         traceback.print_exc()
         return jsonify({'error': f'An error occurred: {str(e)}'}), 500
+
+
+@app.route('/uploads/<filename>')
+def download_file(filename):
+    """Serve uploaded files"""
+    return send_from_directory(UPLOAD_FOLDER, filename)
 
 
 @app.route('/health', methods=['GET'])
@@ -558,7 +566,6 @@ if __name__ == '__main__':
         if debug_mode:
             print("📱 Open your browser and go to: http://localhost:5000")
         
-        print("\n" + "=" * 60)
         app.run(debug=debug_mode, host='0.0.0.0', port=port)
     except FileNotFoundError as e:
         print(f"\n❌ Error: {e}")

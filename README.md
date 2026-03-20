@@ -1,4 +1,4 @@
-# 🎯 Resume Booster AI - Web Application
+# 🎯 NextHire.AI - Web Application
 
 An AI-powered web application that analyzes resumes and predicts the best-matching job roles with confidence scores.
 

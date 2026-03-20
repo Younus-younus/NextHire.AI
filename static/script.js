@@ -3,6 +3,7 @@ import { AlignmentType, BorderStyle, Document, HeadingLevel, Packer, Paragraph, 
 
 // State management
 let currentFile = null;
+let resumeContentForPreview = null; // Store resume content for display
 
 // DOM Elements
 const uploadSection = document.getElementById('uploadSection');
@@ -153,7 +154,22 @@ async function analyzeResume() {
 
     } catch (error) {
         showError(error.message);
+        resumeContentForPreview = null; // Clear on error
     }
+}
+
+// Read file content
+async function readFileContent(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            resolve(event.target.result);
+        };
+        reader.onerror = (error) => {
+            reject(error);
+        };
+        reader.readAsText(file);
+    });
 }
 
 // Display results
@@ -181,7 +197,7 @@ function displayResults(data) {
     if (data.extracted_skills && data.extracted_skills.length > 0) {
         data.extracted_skills.forEach(skill => {
             const badge = document.createElement('span');
-            badge.className = 'skill-badge';
+            badge.className = 'skill-pill';
             badge.textContent = skill;
             skillsContainer.appendChild(badge);
         });
@@ -197,6 +213,11 @@ function displayResults(data) {
 
     // Display interview questions
     displayInterviewQuestions(data.interview_prep);
+
+    // Display resume preview from file URL
+    if (data.resume_file_url) {
+        displayResumePreview(data.resume_file_url, data.resume_filename);
+    }
 
     // Update sidebar
     updateSidebar(data);
@@ -341,6 +362,98 @@ function displayInterviewQuestions(interviewPrepList) {
     });
 }
 
+// Display resume preview from file URL
+function displayResumePreview(fileUrl, filename) {
+    const previewDiv = document.getElementById('resumePreview');
+    if (!previewDiv || !fileUrl) {
+        if (previewDiv) {
+            previewDiv.innerHTML = '<p style="color: #999;">No resume to display</p>';
+        }
+        return;
+    }
+
+    // Get file extension
+    const fileExtension = filename.split('.').pop().toLowerCase();
+
+    // Clear and add appropriate viewer
+    if (fileExtension === 'pdf') {
+        // Use PDF viewer iframe
+        previewDiv.innerHTML = `
+            <div style="display: flex; flex-direction: column; height: 100%;">
+                <iframe 
+                    src="${fileUrl}" 
+                    style="flex: 1; border: none; border-radius: 8px;" 
+                    type="application/pdf">
+                </iframe>
+                <a href="${fileUrl}" target="_blank" style="margin-top: 0.8rem; text-align: center; color: #2b5d6e; font-weight: 600; text-decoration: none;">
+                    📥 Download Resume
+                </a>
+            </div>
+        `;
+    } else if (fileExtension === 'docx') {
+        // For DOCX, show download link and preview option
+        previewDiv.innerHTML = `
+            <div style="text-align: center; padding: 2rem;">
+                <div style="font-size: 3rem; margin-bottom: 1rem;">📄</div>
+                <p style="color: #555; margin-bottom: 1rem;"><strong>${filename}</strong></p>
+                <p style="color: #999; margin-bottom: 1.5rem;">DOCX files can't be previewed directly in browser</p>
+                <a href="${fileUrl}" download="${filename}" style="
+                    display: inline-block;
+                    background: linear-gradient(135deg, #2b5d6e 0%, #3d7a8f 100%);
+                    color: white;
+                    padding: 0.9rem 2rem;
+                    border-radius: 8px;
+                    text-decoration: none;
+                    font-weight: 600;
+                    transition: all 0.3s;
+                " onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 10px 30px rgba(0,0,0,0.2)';"
+                   onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none';">
+                    📥 Download Resume
+                </a>
+            </div>
+        `;
+    } else if (fileExtension === 'txt') {
+        // For TXT files, fetch and display as text
+        fetch(fileUrl)
+            .then(response => response.text())
+            .then(text => {
+                const lines = text.split('\n');
+                let html = '';
+                let currentSection = '';
+
+                lines.forEach(line => {
+                    const trimmedLine = line.trim();
+                    if (!trimmedLine) return;
+
+                    // Detect section headers
+                    const isHeader = /^[A-Z\s]{4,}$/.test(trimmedLine) || 
+                                    /^[A-Z][A-Z\s]+$/.test(trimmedLine);
+
+                    if (isHeader && trimmedLine.length > 3) {
+                        if (currentSection) {
+                            html += '</div>';
+                        }
+                        currentSection = trimmedLine;
+                        html += `<div class="resume-section"><div class="resume-section-header">${trimmedLine}</div>`;
+                    } else if (currentSection) {
+                        html += `<p>${trimmedLine}</p>`;
+                    }
+                });
+
+                if (currentSection) {
+                    html += '</div>';
+                }
+
+                previewDiv.innerHTML = html || '<p style="color: #999;">Resume content loaded</p>';
+            })
+            .catch(err => {
+                previewDiv.innerHTML = '<p style="color: #999;">Could not load resume preview</p>';
+            });
+    } else {
+        previewDiv.innerHTML = '<p style="color: #999;">Unsupported file format for preview</p>';
+    }
+}
+
 // Show section
 function showSection(section) {
     uploadSection.style.display = 'none';
@@ -373,6 +486,12 @@ function showError(message) {
 // Reset to upload
 function resetToUpload() {
     removeFile({ stopPropagation: () => {} });
+    resumeContentForPreview = null; // Clear stored resume content
+    // Clear the preview
+    const previewDiv = document.getElementById('resumePreview');
+    if (previewDiv) {
+        previewDiv.innerHTML = '<p style="color: #999;">Your resume will appear here</p>';
+    }
     showSection('upload');
 }
 
@@ -418,11 +537,11 @@ function shareResults() {
     const primaryRole = document.getElementById('primaryRole').textContent;
     const confidence = document.getElementById('primaryConfidenceText').textContent;
     
-    const shareText = `I just analyzed my resume with Resume Booster AI!\n\nBest Match: ${primaryRole}\nConfidence: ${confidence}\n\nCheck it out and discover your perfect career match!`;
+    const shareText = `I just analyzed my resume with NextHire.AI!\n\nBest Match: ${primaryRole}\nConfidence: ${confidence}\n\nCheck it out and discover your perfect career match!`;
     
     if (navigator.share) {
         navigator.share({
-            title: 'Resume Booster AI Results',
+            title: 'NextHire.AI Results',
             text: shareText
         }).catch(err => console.log('Error sharing:', err));
     } else {
