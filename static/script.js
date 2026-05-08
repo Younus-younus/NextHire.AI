@@ -681,6 +681,114 @@ function setupSidebarButtons() {
 let selectedTemplate = 'standard';
 let resumeData = {};
 
+const RESUME_VALIDATION_RULES = {
+    textOnly: ['[name="fullName"]'],
+    phone: ['[name="phone"]'],
+    educationYear: ['[name="eduYear[]"]'],
+    certificationYear: ['[name="certYear[]"]']
+};
+
+function applyResumeBuilderValidation(root = document) {
+    bindLettersOnlyFields(root.querySelectorAll(RESUME_VALIDATION_RULES.textOnly.join(',')));
+    bindPhoneFields(root.querySelectorAll(RESUME_VALIDATION_RULES.phone.join(',')));
+    bindEducationYearFields(root.querySelectorAll(RESUME_VALIDATION_RULES.educationYear.join(',')));
+    bindCertificationYearFields(root.querySelectorAll(RESUME_VALIDATION_RULES.certificationYear.join(',')));
+}
+
+function bindLettersOnlyFields(fields) {
+    fields.forEach((field) => {
+        if (field.dataset.resumeValidationBound === 'true') {
+            return;
+        }
+
+        field.dataset.resumeValidationBound = 'true';
+        field.setAttribute('pattern', '[A-Za-z ]+');
+        field.setAttribute('title', 'Use letters and spaces only.');
+
+        field.addEventListener('input', () => {
+            const cleanedValue = field.value.replace(/[^A-Za-z ]/g, '');
+            if (field.value !== cleanedValue) {
+                field.value = cleanedValue;
+            }
+        });
+    });
+}
+
+function bindPhoneFields(fields) {
+    fields.forEach((field) => {
+        if (field.dataset.resumeValidationBound === 'true') {
+            return;
+        }
+
+        field.dataset.resumeValidationBound = 'true';
+        field.setAttribute('inputmode', 'numeric');
+        field.setAttribute('maxlength', '10');
+        field.setAttribute('pattern', '\\d{10}');
+        field.setAttribute('title', 'Enter exactly 10 digits.');
+
+        const validatePhone = () => {
+            const digitCount = field.value.replace(/\D/g, '').length;
+            if (!field.value || digitCount === 10) {
+                field.setCustomValidity('');
+                return;
+            }
+
+            field.setCustomValidity('Phone number must contain exactly 10 digits.');
+        };
+
+        field.addEventListener('input', () => {
+            const cleanedValue = field.value.replace(/\D/g, '').slice(0, 10);
+            if (field.value !== cleanedValue) {
+                field.value = cleanedValue;
+            }
+            validatePhone();
+        });
+
+        field.addEventListener('blur', validatePhone);
+    });
+}
+
+function bindEducationYearFields(fields) {
+    fields.forEach((field) => {
+        if (field.dataset.resumeValidationBound === 'true') {
+            return;
+        }
+
+        field.dataset.resumeValidationBound = 'true';
+        field.setAttribute('inputmode', 'numeric');
+        field.setAttribute('pattern', '\\d{4}(\\s*-\\s*\\d{4})?');
+        field.setAttribute('title', 'Use a year or a year range like 2018 or 2018 - 2022.');
+
+        field.addEventListener('input', () => {
+            const cleanedValue = field.value.replace(/[^0-9\- ]/g, '');
+            if (field.value !== cleanedValue) {
+                field.value = cleanedValue;
+            }
+        });
+    });
+}
+
+function bindCertificationYearFields(fields) {
+    fields.forEach((field) => {
+        if (field.dataset.resumeValidationBound === 'true') {
+            return;
+        }
+
+        field.dataset.resumeValidationBound = 'true';
+        field.setAttribute('inputmode', 'numeric');
+        field.setAttribute('maxlength', '4');
+        field.setAttribute('pattern', '\\d{4}');
+        field.setAttribute('title', 'Use a 4-digit year.');
+
+        field.addEventListener('input', () => {
+            const cleanedValue = field.value.replace(/\D/g, '').slice(0, 4);
+            if (field.value !== cleanedValue) {
+                field.value = cleanedValue;
+            }
+        });
+    });
+}
+
 // Initialize Resume Builder
 document.addEventListener('DOMContentLoaded', () => {
     // Template selection (for resume_builder.html)
@@ -706,6 +814,8 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Generate resume button (for resume_builder.html)
     document.getElementById('generateResume')?.addEventListener('click', generateResume);
+
+    applyResumeBuilderValidation();
 });
 
 // Add education item
@@ -735,6 +845,7 @@ function addEducationItem() {
         <button type="button" class="remove-item-btn" onclick="removeItem(this)">Remove</button>
     `;
     container.appendChild(item);
+    applyResumeBuilderValidation(item);
 }
 
 // Add experience item
@@ -764,6 +875,7 @@ function addExperienceItem() {
         <button type="button" class="remove-item-btn" onclick="removeItem(this)">Remove</button>
     `;
     container.appendChild(item);
+    applyResumeBuilderValidation(item);
 }
 
 // Add project item
@@ -793,6 +905,7 @@ function addProjectItem() {
         <button type="button" class="remove-item-btn" onclick="removeItem(this)">Remove</button>
     `;
     container.appendChild(item);
+    applyResumeBuilderValidation(item);
 }
 
 // Add certification item
@@ -818,6 +931,7 @@ function addCertificationItem() {
         <button type="button" class="remove-item-btn" onclick="removeItem(this)">Remove</button>
     `;
     container.appendChild(item);
+    applyResumeBuilderValidation(item);
 }
 
 // Remove item
@@ -922,9 +1036,10 @@ function collectFormData() {
 // Generate resume
 async function generateResume(event) {
     const form = document.getElementById('resumeForm');
+
+    applyResumeBuilderValidation(form);
     
-    if (!form.checkValidity()) {
-        form.reportValidity();
+    if (!form.reportValidity()) {
         return;
     }
     

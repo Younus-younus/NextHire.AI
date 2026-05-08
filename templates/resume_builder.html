@@ -39,7 +39,7 @@
                             <div class="form-grid">
                                 <div class="form-group">
                                     <label>Full Name *</label>
-                                    <input type="text" name="fullName" required placeholder="John Doe">
+                                    <input type="text" name="fullName" required placeholder="John Doe" pattern="[A-Za-z ]+" title="Use letters and spaces only.">
                                 </div>
                                 <div class="form-group">
                                     <label>Email *</label>
@@ -47,7 +47,7 @@
                                 </div>
                                 <div class="form-group">
                                     <label>Phone *</label>
-                                    <input type="tel" name="phone" required placeholder="+1 234 567 8900">
+                                    <input type="tel" name="phone" required placeholder="1234567890" inputmode="numeric" maxlength="10" pattern="\d{10}" title="Enter exactly 10 digits.">
                                 </div>
                                 <div class="form-group">
                                     <label>Location *</label>
